@@ -9,10 +9,12 @@
 import UIKit
 import CoreLocation
 
+
 final class ViewController: UIViewController, CLLocationManagerDelegate, UITableViewDelegate, UITableViewDataSource {
     
      var dict: [String : String] = [:]
     
+    @IBOutlet weak var iconImage: UIImageView!
     @IBOutlet weak var tempertureLabel: UILabel!
     @IBOutlet weak var locationTextField: UITextField!
     @IBOutlet weak var iconLabel: UILabel!
@@ -31,43 +33,48 @@ final class ViewController: UIViewController, CLLocationManagerDelegate, UITable
         locationManager.requestWhenInUseAuthorization()
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
         locationManager.startUpdatingLocation()
+        
+        getCurrentWeather()
+        getDailyForecast()
     }
     
-    private func getWeather() {
-        getLocation(location: locationTextField.text ?? "No Location Entered")
-    }
     
     func getLocation(location: String) {
         CLGeocoder().geocodeAddressString(location) { (placemarks:[CLPlacemark]?, error:Error?) in
             if error == nil {
                 if let location = placemarks?.first?.location {
-                    Weather.forecast(withLocation: location.coordinate, completion: { (results:[Weather]?) in
-                        
-                        if let weatherData = results {
-                            self.weeklyForcast = weatherData
-                            
-                            DispatchQueue.main.async {
-                              self.tableview.reloadData()
-                            }
-                            
-                        }
-                        
-                    })
-                    Weather.getCurrentWeather(withLocation: location.coordinate, completion: { (results:[Weather]?) in
-                        
-                        if let currentData = results {
-                            self.forecastData = currentData
-                            
-                        }
-                    })
+                    }
                 }
-                
             }
+        }
+    
+    @IBAction func getWeatherButton(_ sender: UIButton) {
+
+    }
+    
+    private func getDailyForecast() {
+        API.shared.getHourlyData(urlString: API.shared.urlString, onCompletion: { (daily: [DailyWeather.Daily]) in
+            print(daily)
+        }) { (err: Error) in
+            print("Error")
         }
     }
     
-    @IBAction func getWeatherButton(_ sender: UIButton) {
-        getWeather()
+    private func getCurrentWeather() {
+        API.shared.getData(urlString: API.shared.urlString, onCompletion: { (weather: Weather) in
+            self.forecastData.append(weather)
+            
+            DispatchQueue.main.async {
+                self.tableview.reloadData()
+                
+                self.tempertureLabel.text = "\(Int(weather.currently.temperature))"
+                self.iconLabel.text = weather.currently.icon
+                self.iconImage.image = UIImage(named: weather.currently.icon)
+            
+            }
+        }){ (err: Error) in
+            print("Error parsing Json \(err)")
+        }
     }
     
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
@@ -83,7 +90,7 @@ final class ViewController: UIViewController, CLLocationManagerDelegate, UITable
     }
     
      func numberOfSections(in tableView: UITableView) -> Int {
-        return weeklyForcast.count
+        return forecastData.count
     }
     
      func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
@@ -102,18 +109,13 @@ final class ViewController: UIViewController, CLLocationManagerDelegate, UITable
      func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "Cell", for: indexPath)
         
-        let currentObject = forecastData[indexPath.row]
-        let weekObject = weeklyForcast[indexPath.row]
+        let weekObject = forecastData[indexPath.row]
         
-        cell.textLabel?.text = weekObject.summary
-        cell.detailTextLabel?.text = "\(Int(weekObject.temperature)) °F"
-        cell.imageView?.image = UIImage(named: weekObject.icon)
+        cell.textLabel?.text = weekObject.currently.summary
+        cell.detailTextLabel?.text = "\(Int(weekObject.currently.temperature)) °F"
+        cell.imageView?.image = UIImage(named: "\(weekObject.currently.icon)")
         cell.backgroundColor = .lightGray
-        
-        tempertureLabel.text = "\(Int(currentObject.temperature))"
-        iconLabel.text = currentObject.icon
         
         return cell
     }
 }
-
